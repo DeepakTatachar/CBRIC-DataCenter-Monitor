@@ -1,3 +1,8 @@
+"""
+@author: Deepak Ravikumar Tatachar, Sangamesh Kodge
+@copyright: Nanoelectronics Research Laboratory
+"""
+
 import paramiko
 from multiprocessing import Array, Value, Process
 import numpy as np
