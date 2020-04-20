@@ -90,7 +90,7 @@ def multiprocess_work(data, stop, server):
             index += 3
 
         data[update_index:final_index] = space_process.flatten()
-        time.sleep(0.05)
+        time.sleep(1)
 
 try:
     from tkinter import * 
