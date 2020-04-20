@@ -43,7 +43,6 @@ def multiprocess_Work(data, stop):
     while(stop[0] == 0):
         for card in range(1, 14):
             hostname = base_name + str(card)
-            print(hostname)
             if(card == 9 or card == 12):
                 continue
             ssh = SSHClient(hostname, username, password)
@@ -60,9 +59,6 @@ def multiprocess_Work(data, stop):
                 num_cards = 3
 
             for j in range(num_cards):
-                print(index)
-                print(string_out)
-                print(string_out[index].split("|"))
                 gpu_mem = string_out[index].split("|")[2].strip()
                 gpu_usage = string_out[index].split("|")[3].split()[0]
                 gpu_mem_usage = gpu_mem.split('/')[0]
