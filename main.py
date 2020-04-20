@@ -2,9 +2,15 @@ import paramiko
 from multiprocessing import Array, Value, Process
 import numpy as np
 import re
-
-username = 'dravikum' 
-password = ''
+import getpass 
+  
+username = getpass.getuser() 
+print("Username:", username)
+try: 
+    password = getpass.getpass()  
+except Exception as error: 
+    print('ERROR', error)    
+        
 base_name = 'cbric-gpu'
 num_servers = 13
 num_cards_per_server = 4
