@@ -59,19 +59,23 @@ def multiprocess_Work(data, stop):
                 num_cards = 3
 
             for j in range(num_cards):
-                gpu_mem = string_out[index].split("|")[2].strip()
-                gpu_usage = string_out[index].split("|")[3].split()[0]
-                gpu_mem_usage = gpu_mem.split('/')[0]
-                gpu_max_mem = gpu_mem.split('/')[1]
+                try:
+                    gpu_mem = string_out[index].split("|")[2].strip()
+                    gpu_usage = string_out[index].split("|")[3].split()[0]
+                    gpu_mem_usage = gpu_mem.split('/')[0]
+                    gpu_max_mem = gpu_mem.split('/')[1]
+                    
+                    mem_usage = int(re.search(r'\d+', gpu_mem_usage).group())
+                    max_mem = int(re.search(r'\d+', gpu_max_mem).group())
+                    usage = int(re.search(r'\d+', gpu_usage).group())
+                
+                    space_process[card-1][j][0] = mem_usage
+                    space_process[card-1][j][1] = max_mem
+                    space_process[card-1][j][2] = usage
+                except:
+                    pass
+                
                 index += 3
-
-                mem_usage = int(re.search(r'\d+', gpu_mem_usage).group())
-                max_mem = int(re.search(r'\d+', gpu_max_mem).group())
-                usage = int(re.search(r'\d+', gpu_usage).group())
-            
-                space_process[card-1][j][0] = mem_usage
-                space_process[card-1][j][1] = max_mem
-                space_process[card-1][j][2] = usage
 
         data[:] = space_process.flatten()
 
