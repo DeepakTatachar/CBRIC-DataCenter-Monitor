@@ -7,7 +7,8 @@ import paramiko
 from multiprocessing import Array, Value, Process
 import numpy as np
 import re
-import getpass 
+import getpass
+import time
   
 username = getpass.getuser() 
 print("Username:", username)
@@ -49,59 +50,65 @@ space = np.zeros((num_servers, num_cards_per_server, 3))
 data = Array('f', space.flatten())
 stop = Array('i', [0])
 
-def multiprocess_Work(data, stop):
-    space_process = np.zeros((num_servers, num_cards_per_server, 3))
+def multiprocess_work(data, stop, server):
+    space_process = np.zeros((num_cards_per_server, 3))
+    update_index = (server-1) * (num_cards_per_server * 3)
+    final_index = update_index + (num_cards_per_server * 3)
     while(stop[0] == 0):
-        for card in range(1, 14):
-            hostname = base_name + str(card)
-            if(card == 9 or card == 12):
-                continue
-            ssh = SSHClient(hostname, username, password)
-            out, err, exit_status = ssh.execute_command('nvidia-smi')
-            string_out = str(out).split('\\n')
-            if(len(string_out) <= 1):
-                
-                continue
+        card = server
+        hostname = base_name + str(card)
+        if(card == 9 or card == 12):
+            continue
 
-            index = 8
-            if(card < 11):
-                num_cards = 4
-            else:
-                num_cards = 3
+        ssh = SSHClient(hostname, username, password)
+        out, err, exit_status = ssh.execute_command('nvidia-smi')
+        string_out = str(out).split('\\n')
 
-            for j in range(num_cards):
-                try:
-                    gpu_mem = string_out[index].split("|")[2].strip()
-                    gpu_usage = string_out[index].split("|")[3].split()[0]
-                    gpu_mem_usage = gpu_mem.split('/')[0]
-                    gpu_max_mem = gpu_mem.split('/')[1]
-                    
-                    mem_usage = int(re.search(r'\d+', gpu_mem_usage).group())
-                    max_mem = int(re.search(r'\d+', gpu_max_mem).group())
-                    usage = int(re.search(r'\d+', gpu_usage).group())
-                
-                    space_process[card-1][j][0] = mem_usage
-                    space_process[card-1][j][1] = max_mem
-                    space_process[card-1][j][2] = usage
-                except:
-                    pass
-                
-                index += 3
+        index = 8
+        if(card < 11):
+            num_cards = 4
+        else:
+            num_cards = 3
 
-        data[:] = space_process.flatten()
+        for j in range(num_cards):
+            try:
+                gpu_mem = string_out[index].split("|")[2].strip()
+                gpu_usage = string_out[index].split("|")[3].split()[0]
+                gpu_mem_usage = gpu_mem.split('/')[0]
+                gpu_max_mem = gpu_mem.split('/')[1]
+                
+                mem_usage = int(re.search(r'\d+', gpu_mem_usage).group())
+                max_mem = int(re.search(r'\d+', gpu_max_mem).group())
+                usage = int(re.search(r'\d+', gpu_usage).group())
+            
+                space_process[j][0] = mem_usage
+                space_process[j][1] = max_mem
+                space_process[j][2] = usage
+            except:
+                pass
+            
+            index += 3
+
+        data[update_index:final_index] = space_process.flatten()
+        time.sleep(0.05)
 
 try:
     from tkinter import * 
 except ImportError:
     from Tkinter import *
 
-p = Process(target=multiprocess_Work, args=[data, stop])
-p.start()
+process = []
+
+for i in range(num_servers):
+    p = Process(target=multiprocess_work, args=[data, stop, i+1])
+    p.start()
+    process.append(p)
 
 def onClosing():
     global stop
     stop[0] = 1
-    p.join()
+    for i in range(num_servers):
+        p.join()
     root.destroy()
 
 root = Tk()
