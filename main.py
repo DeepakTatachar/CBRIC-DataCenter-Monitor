@@ -94,8 +94,10 @@ def multiprocess_work(data, stop, server):
 
 try:
     from tkinter import * 
+    import tkinter.font as tkFont
 except ImportError:
     from Tkinter import *
+    import Tkinter.font as tkFont
 
 process = []
 
@@ -124,10 +126,10 @@ for j in range(5): #Columns
     if(j == 0):
         text = "Server Name "
     else:
-        text = "GPU "+ str(j) +" Usage"
-    f = Frame(root, height=20, width=100, borderwidth=2, relief="groove")
+        text = "GPU "+ str(j) +" Usage(Mem)"
+    f = Frame(root, height=30, width=180, borderwidth=5, relief="groove")
     f.pack_propagate(0) # don't shrink
-    b = Label(f, text=text)
+    b = Label(f, text=text, font = tkFont.Font(family="helvetica", size=12))
     b.pack()
     f.grid(row=0, column=j)
 ui_elemets = []
@@ -140,9 +142,9 @@ for i in range(1,14): #Rows
             text = ""
         var = StringVar()
         var.set(text)
-        f = Frame(root, height=20, width=100, borderwidth=2, relief="groove")
+        f = Frame(root, height=30, width=180, borderwidth=5, relief="groove")
         f.pack_propagate(0) # don't shrink
-        b = Label(f, textvariable = var)
+        b = Label(f, textvariable = var, font = tkFont.Font(family="helvetica", size=12))
         b.pack()
         if(j != 0):
             row_ui_elemts.append(var)
@@ -158,7 +160,7 @@ def updateUI():
             mem_usage = np_data[i,j,0]
             max_mem = np_data[i,j,1]
             usage = np_data[i,j,2]
-            text =  str(usage) + "%"
+            text =  str(usage) + "%(" + str(mem_usage)+ 'MB)'
             b.set(text)
 
     root.after(1000, updateUI)
