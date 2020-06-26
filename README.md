@@ -16,7 +16,7 @@ python main.py
 ```
 - Runs on Windows, Linux and MacOS
 - Runs outside of ecn servers, yes you can run this on you personal PC/Mac
-- If you username is different from the one on the machine, use
+- If your username is different from the one on the machine, use
 ```
 python main.py --u 'username on CBRIC machines'
 ``` 
