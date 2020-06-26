@@ -4,23 +4,14 @@
 """
 
 import paramiko
+import multiprocessing
 from multiprocessing import Array, Value, Process
 import numpy as np
 import re
 import getpass
 import time
+import argparse
   
-username = getpass.getuser() 
-print("Username:", username)
-try: 
-    password = getpass.getpass()  
-except Exception as error: 
-    print('ERROR', error)    
-        
-base_name = 'cbric-gpu'
-num_servers = 13
-num_cards_per_server = 4
-
 class SSHClient():
     PORT = 22
     NBYTES = 4096
@@ -46,19 +37,20 @@ class SSHClient():
         self.client.close()
         return stdout_data, stderr_data, exit_status
 
-space = np.zeros((num_servers, num_cards_per_server, 3))
-data = Array('f', space.flatten())
-stop = Array('i', [0])
+def multiprocess_work(data, 
+                      stop, 
+                      server, 
+                      num_cards_per_server, 
+                      base_name,
+                      username, 
+                      password):
 
-def multiprocess_work(data, stop, server):
     space_process = np.zeros((num_cards_per_server, 3))
     update_index = (server-1) * (num_cards_per_server * 3)
     final_index = update_index + (num_cards_per_server * 3)
     while(stop[0] == 0):
         card = server
-        hostname = base_name + str(card)
-        if(card == 9 or card == 12):
-            continue
+        hostname = base_name + str(card) + '.ecn.purdue.edu'
 
         ssh = SSHClient(hostname, username, password)
         out, err, exit_status = ssh.execute_command('nvidia-smi')
@@ -90,7 +82,7 @@ def multiprocess_work(data, stop, server):
             index += 3
 
         data[update_index:final_index] = space_process.flatten()
-        time.sleep(1)
+        time.sleep(2)
 
 try:
     from tkinter import * 
@@ -99,60 +91,13 @@ except ImportError:
     from Tkinter import *
     import Tkinter.font as tkFont
 
-process = []
-
-for i in range(num_servers):
-    p = Process(target=multiprocess_work, args=[data, stop, i+1])
-    p.start()
-    process.append(p)
-
-def onClosing():
-    global stop
+def onClosing(num_servers, processes, root, stop):
     stop[0] = 1
-    for i in range(num_servers):
+    for p in processes:
         p.join()
     root.destroy()
 
-root = Tk()
-root.wm_title("GPU Monitor")
-root.protocol("WM_DELETE_WINDOW", onClosing)
-rows = 0
-while rows < 16:
-    root.rowconfigure(rows, weight=1)
-    root.columnconfigure(rows,weight=1)
-    rows += 1
-
-for j in range(5): #Columns
-    if(j == 0):
-        text = "Server Name "
-    else:
-        text = "GPU "+ str(j) +" Usage(Mem)"
-    f = Frame(root, height=30, width=180, borderwidth=5, relief="groove")
-    f.pack_propagate(0) # don't shrink
-    b = Label(f, text=text, font = tkFont.Font(family="helvetica", size=12))
-    b.pack()
-    f.grid(row=0, column=j)
-ui_elemets = []
-for i in range(1,14): #Rows
-    row_ui_elemts = []
-    for j in range(5): #Columns
-        if(j == 0):
-            text = "CBRIC GPU " + str(i)
-        else:
-            text = ""
-        var = StringVar()
-        var.set(text)
-        f = Frame(root, height=30, width=180, borderwidth=5, relief="groove")
-        f.pack_propagate(0) # don't shrink
-        b = Label(f, textvariable = var, font = tkFont.Font(family="helvetica", size=12))
-        b.pack()
-        if(j != 0):
-            row_ui_elemts.append(var)
-        f.grid(row=i, column=j)
-    ui_elemets.append(row_ui_elemts)
-
-def updateUI():
-    global data
+def updateUI(data, root, num_servers, num_cards_per_server, ui_elemets):
     np_data = np.array(data[:]).reshape((num_servers, num_cards_per_server, 3))
     for i in range(13): #Rows
         for j in range(4): #Columns
@@ -163,7 +108,87 @@ def updateUI():
             text =  str(usage) + "%(" + str(mem_usage)+ 'MB)'
             b.set(text)
 
-    root.after(1000, updateUI)
+    root.after(2000, lambda: updateUI(data, root, num_servers, num_cards_per_server, ui_elemets))
 
-updateUI()
-mainloop()
+def main():
+    parser = argparse.ArgumentParser(description='GPU Monitor', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--u', default='', type=str, help='Set this when the user name is different from login')
+    args = parser.parse_args()
+
+    if(args.u == ''):
+        username = getpass.getuser()
+    else:
+        username = args.u
+    print("Username:", username)
+    try: 
+        password = getpass.getpass()  
+    except Exception as error: 
+        print('ERROR', error)    
+        
+    base_name = 'cbric-gpu'
+    num_servers = 13
+    num_cards_per_server = 4
+    
+    space = np.zeros((num_servers, num_cards_per_server, 3))
+    data = Array('f', space.flatten())
+    stop = Array('i', [0])
+
+    process = []
+    for i in range(num_servers):
+        p = Process(target=multiprocess_work, args=[data, 
+                                                    stop,
+                                                    i+1, 
+                                                    num_cards_per_server, 
+                                                    base_name,
+                                                    username,
+                                                    password])
+        p.start()
+        process.append(p)
+
+    root = Tk()
+    root.wm_title("GPU Monitor")
+    root.protocol("WM_DELETE_WINDOW", lambda: onClosing(num_servers, process, root, stop))
+    rows = 0
+    while rows < 16:
+        root.rowconfigure(rows, weight=1)
+        root.columnconfigure(rows,weight=1)
+        rows += 1
+
+    for j in range(5): #Columns
+        if(j == 0):
+            text = "Server Name "
+        else:
+            text = "GPU "+ str(j) +" Usage(Mem)"
+        f = Frame(root, height=30, width=180, borderwidth=5, relief="groove")
+        f.pack_propagate(0) # don't shrink
+        b = Label(f, text=text, font = tkFont.Font(family="helvetica", size=12))
+        b.pack()
+        f.grid(row=0, column=j)
+
+    ui_elemets = []
+
+    for i in range(1, 14): #Rows
+        row_ui_elemts = []
+        for j in range(5): #Columns
+            if(j == 0):
+                text = "CBRIC GPU " + str(i)
+            else:
+                text = ""
+            var = StringVar()
+            var.set(text)
+            f = Frame(root, height=30, width=180, borderwidth=5, relief="groove")
+            f.pack_propagate(0) # don't shrink
+            b = Label(f, textvariable = var, font = tkFont.Font(family="helvetica", size=12))
+            b.pack()
+            if(j != 0):
+                row_ui_elemts.append(var)
+            f.grid(row=i, column=j)
+        ui_elemets.append(row_ui_elemts)
+
+    updateUI(data, root, num_servers, num_cards_per_server, ui_elemets)
+    mainloop()
+
+if __name__ == '__main__':
+    # On Windows calling this function is necessary
+    multiprocessing.freeze_support()
+    main()
